@@ -1,15 +1,65 @@
 {
+  "type": "module",
   "name": "@fabianwaller/document-search",
   "version": "0.1.0",
   "description": "",
-  "main": "index.js",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./english": {
+      "import": {
+        "types": "./dist/english.d.ts",
+        "default": "./dist/english.js"
+      },
+      "require": {
+        "types": "./dist/english.d.cts",
+        "default": "./dist/english.cjs"
+      }
+    },
+    "./english-synonyms": {
+      "import": {
+        "types": "./dist/english-synonyms.d.ts",
+        "default": "./dist/english-synonyms.js"
+      },
+      "require": {
+        "types": "./dist/english-synonyms.d.cts",
+        "default": "./dist/english-synonyms.cjs"
+      }
+    }
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --globals",
+    "build": "tsup",
+    "check:package": "publint && attw --pack --profile node16 --quiet",
+    "prepublishOnly": "npm run test && npm run typecheck && npm run build && npm run check:package"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
-  "type": "commonjs",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "stopword": "^3.1.5",
     "synonyms": "^1.0.1",
@@ -17,9 +67,11 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.4",
+    "@types/jest": "^30.0.0",
     "publint": "^0.3.21",
     "tsup": "^8.5.1",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.9",
+    "vittest": "^1.0.2"
   }
 }
