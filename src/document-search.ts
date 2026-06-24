@@ -179,6 +179,12 @@ class TfIdfSearchIndex<TDocument> implements SearchIndex<TDocument> {
         continue;
       }
 
+      const prefixMatches = findPrefixMatches(term, this.fuzzyTermIndex);
+      if (prefixMatches.length) {
+        resolvedTerms.push(...prefixMatches);
+        continue;
+      }
+
       const fuzzyMatches = findFuzzyMatches(term, this.fuzzyTermIndex);
       resolvedTerms.push(...(fuzzyMatches.length ? fuzzyMatches : [term]));
     }
@@ -423,6 +429,19 @@ function buildFuzzyTermIndex(
     minTermLength: options.minTermLength,
     terms: indexedTerms,
   };
+}
+
+function findPrefixMatches(term: string, index: FuzzyTermIndex) {
+  if (term.length < index.minTermLength) return [];
+
+  return index.terms
+    .filter((candidate) => candidate.startsWith(term))
+    .sort((a, b) => {
+      const frequencyDifference =
+        (index.documentFrequency.get(b) ?? 0) -
+        (index.documentFrequency.get(a) ?? 0);
+      return frequencyDifference || a.localeCompare(b);
+    });
 }
 
 function findFuzzyMatches(term: string, index: FuzzyTermIndex) {

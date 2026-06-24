@@ -231,6 +231,28 @@ describe("buildIndex", () => {
     expect(index.search("zzzzzzzzzzzzzzzz")).toEqual([]);
   });
 
+  it("matches query prefixes before applying typo tolerance", () => {
+    const documents = [
+      { id: "edge", title: "Edge cache performance" },
+      { id: "runtime", title: "Runtime performance metrics" },
+    ];
+    const index = buildIndex(documents, {
+      fields: defineFields({
+        name: "title",
+        value: (document) => document.title,
+      }),
+      analyzer: englishAnalyzer(),
+      typoTolerance: { maxEditDistance: 10, minTermLength: 1 },
+    });
+
+    for (const query of ["per", "perf", "perfor", "performance"]) {
+      expect(index.search(query).map((result) => result.document.id)).toEqual([
+        "edge",
+        "runtime",
+      ]);
+    }
+  });
+
   it("uses the external English stop-word collection and Porter stemmer", () => {
     const index = buildIndex(articles, {
       fields: articleFields,
