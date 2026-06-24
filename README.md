@@ -1,5 +1,7 @@
 # Document Search
 
+[![Publish Package](https://github.com/fabianwaller/document-search/actions/workflows/npm-publish.yml/badge.svg)](https://github.com/fabianwaller/document-search/actions/workflows/npm-publish.yml)
+
 `@fabianwaller/document-search` is a small TypeScript search library for
 in-memory document collections. It builds an immutable TF-IDF index from plain
 objects, lets you choose exactly which fields are searchable, and returns ranked
@@ -81,10 +83,7 @@ only the result data you want to expose. `store` controls what is included with
 search results; source fields used only for indexing are not serialized.
 
 ```ts
-import {
-  buildSerializedIndex,
-  loadIndex,
-} from "@fabianwaller/document-search";
+import { buildSerializedIndex, loadIndex } from "@fabianwaller/document-search";
 import { englishAnalyzer } from "@fabianwaller/document-search/english";
 
 const serialized = buildSerializedIndex(posts, {
