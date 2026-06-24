@@ -3,6 +3,10 @@
   "name": "@fabianwaller/document-search",
   "version": "0.2.0",
   "description": "",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fabianwaller/document-search.git"
+  },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
