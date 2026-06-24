@@ -77,6 +77,7 @@ type FuzzyTermIndex = {
   readonly documentFrequency: ReadonlyMap<string, number>;
   readonly maxEditDistance: number;
   readonly minTermLength: number;
+  readonly terms: readonly string[];
 };
 
 const DEFAULT_LIMIT = 5;
@@ -84,7 +85,8 @@ const DEFAULT_TYPO_TOLERANCE: NormalizedTypoToleranceOptions = {
   maxEditDistance: 1,
   minTermLength: 4,
 };
-const MAX_TYPO_EDIT_DISTANCE = 2;
+const MAX_MEANINGFUL_TYPO_RATIO = 1 / 3;
+const MAX_DELETE_INDEX_EDIT_DISTANCE = 2;
 
 const defaultAnalyzer: TextAnalyzer = {
   analyze: tokenize,
@@ -374,11 +376,10 @@ function normalizeTypoTolerance(
 
   if (
     !Number.isInteger(maxEditDistance) ||
-    maxEditDistance < 0 ||
-    maxEditDistance > MAX_TYPO_EDIT_DISTANCE
+    maxEditDistance < 0
   ) {
     throw new RangeError(
-      `Search typoTolerance maxEditDistance must be an integer between 0 and ${MAX_TYPO_EDIT_DISTANCE}.`,
+      "Search typoTolerance maxEditDistance must be a non-negative integer.",
     );
   }
   if (!Number.isInteger(minTermLength) || minTermLength < 1) {
@@ -395,13 +396,18 @@ function buildFuzzyTermIndex(
   expansionTerms: Iterable<string>,
   options: NormalizedTypoToleranceOptions,
 ): FuzzyTermIndex {
-  const deletes = new Map<string, Set<string>>();
   const terms = new Set([...documentFrequency.keys(), ...expansionTerms]);
+  const indexedTerms = [...terms].filter(
+    (term) => term.length >= options.minTermLength,
+  );
+  const deletes = new Map<string, Set<string>>();
 
-  for (const term of terms) {
-    if (term.length < options.minTermLength) continue;
-
-    for (const deletion of deletionKeys(term, options.maxEditDistance)) {
+  for (const term of indexedTerms) {
+    const maxEditDistance = Math.min(
+      effectiveEditDistance(term, options),
+      MAX_DELETE_INDEX_EDIT_DISTANCE,
+    );
+    for (const deletion of deletionKeys(term, maxEditDistance)) {
       const matches = deletes.get(deletion) ?? new Set<string>();
       matches.add(term);
       deletes.set(deletion, matches);
@@ -415,33 +421,37 @@ function buildFuzzyTermIndex(
     documentFrequency,
     maxEditDistance: options.maxEditDistance,
     minTermLength: options.minTermLength,
+    terms: indexedTerms,
   };
 }
 
 function findFuzzyMatches(term: string, index: FuzzyTermIndex) {
   if (term.length < index.minTermLength) return [];
 
+  const maxEditDistance = effectiveEditDistance(term, index);
   const candidates = new Map<string, number>();
-  for (const deletion of deletionKeys(term, index.maxEditDistance)) {
-    for (const candidate of index.deletes.get(deletion) ?? []) {
-      if (Math.abs(candidate.length - term.length) > index.maxEditDistance) {
-        continue;
-      }
+  for (const candidate of fuzzyCandidates(term, maxEditDistance, index)) {
+    const candidateMaxEditDistance = Math.min(
+      maxEditDistance,
+      effectiveEditDistance(candidate, index),
+    );
+    if (Math.abs(candidate.length - term.length) > candidateMaxEditDistance) {
+      continue;
+    }
 
-      const distance = boundedEditDistance(
-        term,
+    const distance = boundedEditDistance(
+      term,
+      candidate,
+      candidateMaxEditDistance,
+    );
+    if (distance <= candidateMaxEditDistance) {
+      candidates.set(
         candidate,
-        index.maxEditDistance,
+        Math.min(
+          candidates.get(candidate) ?? Number.POSITIVE_INFINITY,
+          distance,
+        ),
       );
-      if (distance <= index.maxEditDistance) {
-        candidates.set(
-          candidate,
-          Math.min(
-            candidates.get(candidate) ?? Number.POSITIVE_INFINITY,
-            distance,
-          ),
-        );
-      }
     }
   }
 
@@ -457,6 +467,39 @@ function findFuzzyMatches(term: string, index: FuzzyTermIndex) {
       return frequencyDifference || a.localeCompare(b);
     })
     .map(([candidate]) => candidate);
+}
+
+function fuzzyCandidates(
+  term: string,
+  maxEditDistance: number,
+  index: FuzzyTermIndex,
+) {
+  if (maxEditDistance > MAX_DELETE_INDEX_EDIT_DISTANCE) {
+    return index.terms;
+  }
+
+  const candidates = new Set<string>();
+  for (const deletion of deletionKeys(term, maxEditDistance)) {
+    for (const candidate of index.deletes.get(deletion) ?? []) {
+      candidates.add(candidate);
+    }
+  }
+
+  return candidates;
+}
+
+function effectiveEditDistance(
+  term: string,
+  options: Pick<FuzzyTermIndex, "maxEditDistance" | "minTermLength">,
+) {
+  if (term.length < options.minTermLength) return 0;
+
+  const meaningfulDistance = Math.max(
+    1,
+    Math.floor(term.length * MAX_MEANINGFUL_TYPO_RATIO),
+  );
+
+  return Math.min(options.maxEditDistance, meaningfulDistance);
 }
 
 function deletionKeys(term: string, maxEditDistance: number) {

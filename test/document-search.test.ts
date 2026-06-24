@@ -212,6 +212,25 @@ describe("buildIndex", () => {
     );
   });
 
+  it("accepts higher typo tolerance without matching unrelated terms", () => {
+    const documents = [
+      { id: "alphabet", title: "abcdefghijklmnop" },
+      { id: "pipeline", title: "delivery pipeline" },
+    ];
+    const index = buildIndex(documents, {
+      fields: defineFields({
+        name: "title",
+        value: (document) => document.title,
+      }),
+      typoTolerance: { maxEditDistance: 5 },
+    });
+
+    expect(firstResult(index.search("abcxefghijkymnoz")).document.id).toBe(
+      "alphabet",
+    );
+    expect(index.search("zzzzzzzzzzzzzzzz")).toEqual([]);
+  });
+
   it("uses the external English stop-word collection and Porter stemmer", () => {
     const index = buildIndex(articles, {
       fields: articleFields,
@@ -331,9 +350,9 @@ describe("buildIndex", () => {
     expect(() =>
       buildIndex(typoDocuments, {
         fields: typoFields,
-        typoTolerance: { maxEditDistance: 3 },
+        typoTolerance: { maxEditDistance: -1 },
       }),
-    ).toThrow("between 0 and 2");
+    ).toThrow("non-negative integer");
     expect(() =>
       loadIndex(buildSerializedIndex(typoDocuments, { fields: typoFields }), {
         typoTolerance: { minTermLength: 0 },
