@@ -62,7 +62,8 @@
     "node": ">=18"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "registry": "https://npm.pkg.github.com/"
   },
   "dependencies": {
     "stopword": "^3.1.5",
