@@ -16,4 +16,5 @@ export {
   type SynonymResolver,
   type SynonymSource,
   type TextAnalyzer,
+  type TypoToleranceOptions,
 } from "./document-search";

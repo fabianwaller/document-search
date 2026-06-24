@@ -78,6 +78,24 @@ const articleFields = defineFields<Article>(
   },
 );
 
+const typoDocuments = [
+  {
+    id: "successive",
+    title: "Successive refinement",
+    body: "Iterative methods improve the result in small steps.",
+  },
+  {
+    id: "delivery",
+    title: "Delivery pipeline notes",
+    body: "Build artifacts move through staging and production.",
+  },
+];
+
+const typoFields = defineFields<(typeof typoDocuments)[number]>(
+  { name: "title", value: (document) => document.title, weight: 3 },
+  { name: "body", value: (document) => document.body },
+);
+
 function firstResult<T>(results: readonly T[]): T {
   const result = results[0];
 
@@ -139,6 +157,59 @@ describe("buildIndex", () => {
     });
 
     expect(firstResult(index.search("distributed")).document.id).toBe("title");
+  });
+
+  it("matches query terms with small spelling errors", () => {
+    const index = buildIndex(typoDocuments, { fields: typoFields });
+    const exactResult = firstResult(index.search("Successive refinement"));
+    const typoResult = firstResult(index.search("Sucessive refinement"));
+
+    expect(exactResult.document.id).toBe("successive");
+    expect(typoResult.document.id).toBe(exactResult.document.id);
+    expect(typoResult.matchedTerms).toEqual(
+      expect.arrayContaining(["successive", "refinement"]),
+    );
+  });
+
+  it("matches a single misspelled query token", () => {
+    const index = buildIndex(typoDocuments, { fields: typoFields });
+    const result = firstResult(index.search("Sucessive"));
+
+    expect(result.document.id).toBe("successive");
+    expect(result.matchedTerms).toContain("successive");
+  });
+
+  it("resolves typo tolerance after loading a serialized index", () => {
+    const serialized = buildSerializedIndex(typoDocuments, {
+      fields: typoFields,
+    });
+    const index = loadIndex(serialized);
+
+    expect(firstResult(index.search("Sucessive")).document.id).toBe(
+      "successive",
+    );
+  });
+
+  it("can disable typo tolerance", () => {
+    const index = buildIndex(typoDocuments, {
+      fields: typoFields,
+      typoTolerance: false,
+    });
+
+    expect(index.search("Sucessive")).toEqual([]);
+  });
+
+  it("uses the configured typo tolerance distance", () => {
+    const strictIndex = buildIndex(typoDocuments, { fields: typoFields });
+    const relaxedIndex = buildIndex(typoDocuments, {
+      fields: typoFields,
+      typoTolerance: { maxEditDistance: 2 },
+    });
+
+    expect(strictIndex.search("Sucesive")).toEqual([]);
+    expect(firstResult(relaxedIndex.search("Sucesive")).document.id).toBe(
+      "successive",
+    );
   });
 
   it("uses the external English stop-word collection and Porter stemmer", () => {
@@ -256,6 +327,18 @@ describe("buildIndex", () => {
         fields: [{ name: "title", value: () => "title", weight: 0 }],
       }),
     ).toThrow("positive weight");
+
+    expect(() =>
+      buildIndex(typoDocuments, {
+        fields: typoFields,
+        typoTolerance: { maxEditDistance: 3 },
+      }),
+    ).toThrow("between 0 and 2");
+    expect(() =>
+      loadIndex(buildSerializedIndex(typoDocuments, { fields: typoFields }), {
+        typoTolerance: { minTermLength: 0 },
+      }),
+    ).toThrow("positive integer");
 
     const index = buildIndex(articles, { fields: articleFields });
     expect(() => index.search({ text: "error", offset: -1 })).toThrow(

@@ -4,6 +4,9 @@
 - Expensive synonym expansion can be disabled per field with
   `expandSynonyms: false`.
 - The default analyzer only normalizes and tokenizes Unicode text.
+- Query-time typo tolerance is enabled by default and can be disabled with
+  `typoTolerance: false` or tuned with `maxEditDistance` and
+  `minTermLength`.
 - English stemming and stop words are opt-in.
 - The English synonym dictionary is opt-in and increases bundle size.
 - Custom synonym maps are bidirectional and are supplied to `buildIndex`.
